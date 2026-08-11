@@ -1,0 +1,120 @@
+name: CodexQuotaWatch
+options:
+  bundleIdPrefix: com.example
+  createIntermediateGroups: true
+  deploymentTarget:
+    iOS: "17.0"
+    watchOS: "10.0"
+packages:
+  WatchQuotaShared:
+    path: .
+settings:
+  base:
+    CODE_SIGN_STYLE: Automatic
+    CURRENT_PROJECT_VERSION: 1
+    MARKETING_VERSION: 0.1.0
+    SWIFT_VERSION: "5.0"
+    SWIFT_STRICT_CONCURRENCY: minimal
+targets:
+  CodexQuotaWatch:
+    type: application
+    platform: iOS
+    deploymentTarget: "17.0"
+    info:
+      path: iPhone/Info.plist
+      properties:
+        CFBundleDisplayName: Agent Quota
+        NSAppTransportSecurity:
+          NSAllowsLocalNetworking: true
+        NSLocalNetworkUsageDescription: 用于连接本地 Mac 额度桥，同步 Claude、Codex、Grok 额度到 iPhone 与 Apple Watch。
+        UILaunchScreen: {}
+    sources:
+      - path: iPhone
+      - path: Assets.xcassets
+    dependencies:
+      - package: WatchQuotaShared
+      - target: CodexQuotaWatchWatch
+        embed: true
+    postCompileScripts:
+      - name: Strip xattrs
+        basedOnDependencyAnalysis: false
+        script: |
+          /usr/bin/xattr -cr "${TARGET_BUILD_DIR}/${FULL_PRODUCT_NAME}" 2>/dev/null || true
+          /usr/bin/find "${TARGET_BUILD_DIR}/${FULL_PRODUCT_NAME}" -exec /usr/bin/xattr -c {} \; 2>/dev/null || true
+    entitlements:
+      path: iPhone/CodexQuotaWatch.entitlements
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.example.CodexQuotaWatch
+        PRODUCT_NAME: CodexQuotaWatch
+        DEVELOPMENT_TEAM: YOUR_TEAM_ID
+        CODE_SIGN_ENTITLEMENTS: iPhone/CodexQuotaWatch.entitlements
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+
+  CodexQuotaWatchWatch:
+    type: application
+    platform: watchOS
+    deploymentTarget: "10.0"
+    sources:
+      - path: Watch
+      - path: Assets.xcassets
+    dependencies:
+      - package: WatchQuotaShared
+      - target: CodexQuotaWatchWidget
+        embed: true
+    entitlements:
+      path: Watch/CodexQuotaWatchWatch.entitlements
+    postCompileScripts:
+      - name: Strip xattrs
+        basedOnDependencyAnalysis: false
+        script: |
+          /usr/bin/xattr -cr "${TARGET_BUILD_DIR}/${FULL_PRODUCT_NAME}" 2>/dev/null || true
+          /usr/bin/find "${TARGET_BUILD_DIR}/${FULL_PRODUCT_NAME}" -exec /usr/bin/xattr -c {} \; 2>/dev/null || true
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.example.CodexQuotaWatch.watchkitapp
+        PRODUCT_NAME: CodexQuotaWatchWatch
+        DEVELOPMENT_TEAM: YOUR_TEAM_ID
+        GENERATE_INFOPLIST_FILE: true
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        CODE_SIGN_ENTITLEMENTS: Watch/CodexQuotaWatchWatch.entitlements
+        INFOPLIST_KEY_CFBundleDisplayName: Agent Quota
+        INFOPLIST_KEY_WKCompanionAppBundleIdentifier: com.example.CodexQuotaWatch
+        INFOPLIST_KEY_WKApplication: true
+        INFOPLIST_KEY_WKRunsIndependentlyOfCompanionApp: false
+        INFOPLIST_KEY_NSMicrophoneUsageDescription: 用于将语音发送到 Mac 转写为文字
+        INFOPLIST_KEY_NSSpeechRecognitionUsageDescription: 用于语音输入确认流程
+
+  CodexQuotaWatchWidget:
+    type: app-extension
+    platform: watchOS
+    deploymentTarget: "10.0"
+    sources:
+      - path: WatchWidget
+    dependencies:
+      - package: WatchQuotaShared
+    entitlements:
+      path: WatchWidget/CodexQuotaWatchWidget.entitlements
+    postCompileScripts:
+      - name: Strip xattrs
+        basedOnDependencyAnalysis: false
+        script: |
+          /usr/bin/xattr -cr "${TARGET_BUILD_DIR}/${FULL_PRODUCT_NAME}" 2>/dev/null || true
+          /usr/bin/find "${TARGET_BUILD_DIR}/${FULL_PRODUCT_NAME}" -exec /usr/bin/xattr -c {} \; 2>/dev/null || true
+    info:
+      path: WatchWidget/Info.plist
+      properties:
+        CFBundleDisplayName: Agent Quota
+        NSExtension:
+          NSExtensionPointIdentifier: com.apple.widgetkit-extension
+        WKSupportsWatchWidgetKitExtension: true
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.example.CodexQuotaWatch.watchkitapp.widget
+        PRODUCT_NAME: CodexQuotaWatchWidget
+        DEVELOPMENT_TEAM: YOUR_TEAM_ID
+        GENERATE_INFOPLIST_FILE: false
+        INFOPLIST_FILE: WatchWidget/Info.plist
+        CODE_SIGN_ENTITLEMENTS: WatchWidget/CodexQuotaWatchWidget.entitlements
+        SKIP_INSTALL: true
+        LD_RUNPATH_SEARCH_PATHS: "$(inherited) @executable_path/Frameworks @executable_path/../../Frameworks"
