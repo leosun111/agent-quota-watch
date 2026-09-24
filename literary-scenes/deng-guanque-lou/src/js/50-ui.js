@@ -316,7 +316,28 @@ const UI = (() => {
     for (const id of ['btn-speech', 'btn-l-speech']) $(id).setAttribute('aria-pressed', String(onv));
     $('btn-l-speech').textContent = onv ? '朗读 · 开' : '朗读 · 关';
   }
-  async function toggleSpeech() {
+  // Music and recitation are on by default. Browsers only allow sound after the
+  // visitor's first click or key press, so until then both stay "armed": the
+  // buttons read 开, and the first gesture anywhere starts them. Pressing one of
+  // the buttons first counts as switching that one off.
+  const armed = { speech: true, sound: true };
+  function bindAudioDefaults() {
+    setSpeechUI(true);
+    setSoundUI(true);
+    const evs = ['pointerdown', 'keydown', 'touchstart'];
+    const onFirst = (e) => {
+      if (e.type === 'keydown' && (e.key === 'Escape' || e.key === 'Tab')) return;
+      for (const ev of evs) window.removeEventListener(ev, onFirst, true);
+      const t = e.target && e.target.closest ? e.target : null;
+      if (armed.sound && !(t && t.closest('#btn-sound,#btn-l-sound,#btn-f-sound'))) { armed.sound = false; toggleSound(); }
+      if (armed.speech && !(t && t.closest('#btn-speech,#btn-l-speech'))) { armed.speech = false; toggleSpeech({ quiet: true }); }
+    };
+    for (const ev of evs) window.addEventListener(ev, onFirst, true);
+  }
+
+  async function toggleSpeech(opts = {}) {
+    if (opts instanceof Event) opts = {};
+    if (armed.speech) { armed.speech = false; setSpeechUI(false); toast('朗读已关闭', 1600); return; }
     const want = !Speech.enabled();
     if (want && storedVoice && !Speech.custom) {
       const sv = storedVoice;
@@ -341,7 +362,7 @@ const UI = (() => {
     setSpeechUI(want && ok);
     if (want && ok) {
       Sound.ensureCtx();
-      toast(Speech.custom ? (Speech.custom.embedded ? `朗读已开启：内置音轨“${Speech.custom.name}”` : '朗读已开启：使用你载入的朗诵音频') : `朗读已开启：${Speech.voice ? Speech.voice.name : '浏览器语音'}`, 2600);
+      if (!opts.quiet) toast(Speech.custom ? (Speech.custom.embedded ? `朗读已开启：内置音轨“${Speech.custom.name}”` : '朗读已开启：使用你载入的朗诵音频') : `朗读已开启：${Speech.voice ? Speech.voice.name : '浏览器语音'}`, 2600);
       app.speechTurnedOn();
     }
   }
@@ -353,6 +374,7 @@ const UI = (() => {
     }
   }
   async function toggleSound() {
+    if (armed.sound) { armed.sound = false; setSoundUI(false); toast('乐声已关闭', 1600); return; }
     const want = !Sound.enabled;
     const ok = await Sound.setEnabled(want);
     if (!ok) { toast('当前浏览器不支持 Web Audio，乐声不可用。'); return; }
@@ -516,13 +538,13 @@ const UI = (() => {
     buildFree();
     buildSettings();
     if (Speech.embedded()) {
-      $('voice-file-note').textContent = `本页已内置朗诵音轨“${Speech.embedded()}”，开启朗读时使用；朗读仍默认关闭。也可载入其他音频替换，或点“清除”改用浏览器语音。`;
+      $('voice-file-note').textContent = `本页已内置朗诵音轨“${Speech.embedded()}”，朗读默认开启。也可载入其他音频替换，或点“清除”改用浏览器语音。`;
       $('voice-clear').hidden = false;
     }
     voiceStore.load().then((r) => {
       if (!r || !r.blob || Speech.custom) return;
       storedVoice = r;
-      $('voice-file-note').textContent = `已记住上次载入的“${r.name}”，开启朗读时自动使用；朗读仍默认关闭。`;
+      $('voice-file-note').textContent = `已记住上次载入的“${r.name}”，朗读时自动使用。`;
       $('voice-clear').hidden = false;
     });
     bindCanvas();
@@ -585,6 +607,7 @@ const UI = (() => {
       if (type === 'awaiting') syncState();
     });
     Speech.init((msg) => { toast(msg, 6000); setSpeechUI(Speech.enabled()); });
+    bindAudioDefaults();
     syncState();
     return prefs;
   }

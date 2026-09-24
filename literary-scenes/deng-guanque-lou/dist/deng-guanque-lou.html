@@ -284,11 +284,11 @@ body.ui-hidden #hud *, body.ui-hidden #freehud *, body.ui-hidden #landing *, bod
       </button>
       <div class="landing-row">
         <button id="btn-free" class="btn-ghost" type="button">自由观景</button>
-        <button id="btn-l-speech" class="chip" type="button" aria-pressed="false">朗读 · 关</button>
-        <button id="btn-l-sound" class="chip" type="button" aria-pressed="false">乐声 · 关</button>
+        <button id="btn-l-speech" class="chip" type="button" aria-pressed="true">朗读 · 开</button>
+        <button id="btn-l-sound" class="chip" type="button" aria-pressed="true">乐声 · 开</button>
         <button id="btn-l-settings" class="chip" type="button">设置</button>
       </div>
-      <p class="landing-hint">拖动可环顾 · 空格暂停 · 声音与朗读默认关闭</p>
+      <p class="landing-hint">拖动可环顾 · 空格暂停 · 乐声与朗读默认开启，点击后开始播放</p>
     </div>
   </div>
 </section>
@@ -335,8 +335,8 @@ body.ui-hidden #hud *, body.ui-hidden #freehud *, body.ui-hidden #landing *, bod
         <button id="btn-pace" class="chip" type="button" title="连贯体验：自动接续；逐章慢读：每幕结束后停留">连贯体验</button>
         <button id="btn-text" class="chip" type="button" title="字幕：原文＋白话 / 只看原文 / 只看白话">原文＋白话</button>
         <button id="btn-toc" class="ib" type="button" aria-label="章节目录" title="章节目录（T）"><svg viewBox="0 0 24 24"><path d="M5 6h14M5 12h14M5 18h9"/></svg></button>
-        <button id="btn-speech" class="ib" type="button" aria-pressed="false" aria-label="朗读" title="朗读"><svg viewBox="0 0 24 24"><path d="M4 10v4h3l4 4V6L7 10zM15 9c1.5 1.5 1.5 4.5 0 6M18 7c2.7 2.7 2.7 7.3 0 10"/></svg><span class="ib-tag">诵</span></button>
-        <button id="btn-sound" class="ib" type="button" aria-pressed="false" aria-label="乐声与环境音" title="乐声与环境音"><svg viewBox="0 0 24 24"><path d="M9 17V5l10-2v12M9 17a2.5 2.5 0 1 1-5 0 2.5 2.5 0 0 1 5 0zM19 15a2.5 2.5 0 1 1-5 0 2.5 2.5 0 0 1 5 0z"/></svg></button>
+        <button id="btn-speech" class="ib" type="button" aria-pressed="true" aria-label="朗读" title="朗读"><svg viewBox="0 0 24 24"><path d="M4 10v4h3l4 4V6L7 10zM15 9c1.5 1.5 1.5 4.5 0 6M18 7c2.7 2.7 2.7 7.3 0 10"/></svg><span class="ib-tag">诵</span></button>
+        <button id="btn-sound" class="ib" type="button" aria-pressed="true" aria-label="乐声与环境音" title="乐声与环境音"><svg viewBox="0 0 24 24"><path d="M9 17V5l10-2v12M9 17a2.5 2.5 0 1 1-5 0 2.5 2.5 0 0 1 5 0zM19 15a2.5 2.5 0 1 1-5 0 2.5 2.5 0 0 1 5 0z"/></svg></button>
         <button id="btn-more" class="ib" type="button" aria-label="更多" aria-haspopup="true" title="更多"><svg viewBox="0 0 24 24"><path d="M6 12h.01M12 12h.01M18 12h.01"/></svg></button>
       </div>
     </div>
@@ -355,7 +355,7 @@ body.ui-hidden #hud *, body.ui-hidden #freehud *, body.ui-hidden #landing *, bod
     <div class="free-actions">
       <button id="btn-f-enter" class="btn-small-primary" type="button">循文入境</button>
       <button id="btn-f-reset" class="chip" type="button">重置视角</button>
-      <button id="btn-f-sound" class="chip" type="button" aria-pressed="false">乐声 · 关</button>
+      <button id="btn-f-sound" class="chip" type="button" aria-pressed="true">乐声 · 开</button>
       <button id="btn-f-more" class="ib" type="button" aria-label="更多"><svg viewBox="0 0 24 24"><path d="M6 12h.01M12 12h.01M18 12h.01"/></svg></button>
     </div>
   </div>
@@ -7316,7 +7316,28 @@ const UI = (() => {
     for (const id of ['btn-speech', 'btn-l-speech']) $(id).setAttribute('aria-pressed', String(onv));
     $('btn-l-speech').textContent = onv ? '朗读 · 开' : '朗读 · 关';
   }
-  async function toggleSpeech() {
+  // Music and recitation are on by default. Browsers only allow sound after the
+  // visitor's first click or key press, so until then both stay "armed": the
+  // buttons read 开, and the first gesture anywhere starts them. Pressing one of
+  // the buttons first counts as switching that one off.
+  const armed = { speech: true, sound: true };
+  function bindAudioDefaults() {
+    setSpeechUI(true);
+    setSoundUI(true);
+    const evs = ['pointerdown', 'keydown', 'touchstart'];
+    const onFirst = (e) => {
+      if (e.type === 'keydown' && (e.key === 'Escape' || e.key === 'Tab')) return;
+      for (const ev of evs) window.removeEventListener(ev, onFirst, true);
+      const t = e.target && e.target.closest ? e.target : null;
+      if (armed.sound && !(t && t.closest('#btn-sound,#btn-l-sound,#btn-f-sound'))) { armed.sound = false; toggleSound(); }
+      if (armed.speech && !(t && t.closest('#btn-speech,#btn-l-speech'))) { armed.speech = false; toggleSpeech({ quiet: true }); }
+    };
+    for (const ev of evs) window.addEventListener(ev, onFirst, true);
+  }
+
+  async function toggleSpeech(opts = {}) {
+    if (opts instanceof Event) opts = {};
+    if (armed.speech) { armed.speech = false; setSpeechUI(false); toast('朗读已关闭', 1600); return; }
     const want = !Speech.enabled();
     if (want && storedVoice && !Speech.custom) {
       const sv = storedVoice;
@@ -7341,7 +7362,7 @@ const UI = (() => {
     setSpeechUI(want && ok);
     if (want && ok) {
       Sound.ensureCtx();
-      toast(Speech.custom ? (Speech.custom.embedded ? `朗读已开启：内置音轨“${Speech.custom.name}”` : '朗读已开启：使用你载入的朗诵音频') : `朗读已开启：${Speech.voice ? Speech.voice.name : '浏览器语音'}`, 2600);
+      if (!opts.quiet) toast(Speech.custom ? (Speech.custom.embedded ? `朗读已开启：内置音轨“${Speech.custom.name}”` : '朗读已开启：使用你载入的朗诵音频') : `朗读已开启：${Speech.voice ? Speech.voice.name : '浏览器语音'}`, 2600);
       app.speechTurnedOn();
     }
   }
@@ -7353,6 +7374,7 @@ const UI = (() => {
     }
   }
   async function toggleSound() {
+    if (armed.sound) { armed.sound = false; setSoundUI(false); toast('乐声已关闭', 1600); return; }
     const want = !Sound.enabled;
     const ok = await Sound.setEnabled(want);
     if (!ok) { toast('当前浏览器不支持 Web Audio，乐声不可用。'); return; }
@@ -7516,13 +7538,13 @@ const UI = (() => {
     buildFree();
     buildSettings();
     if (Speech.embedded()) {
-      $('voice-file-note').textContent = `本页已内置朗诵音轨“${Speech.embedded()}”，开启朗读时使用；朗读仍默认关闭。也可载入其他音频替换，或点“清除”改用浏览器语音。`;
+      $('voice-file-note').textContent = `本页已内置朗诵音轨“${Speech.embedded()}”，朗读默认开启。也可载入其他音频替换，或点“清除”改用浏览器语音。`;
       $('voice-clear').hidden = false;
     }
     voiceStore.load().then((r) => {
       if (!r || !r.blob || Speech.custom) return;
       storedVoice = r;
-      $('voice-file-note').textContent = `已记住上次载入的“${r.name}”，开启朗读时自动使用；朗读仍默认关闭。`;
+      $('voice-file-note').textContent = `已记住上次载入的“${r.name}”，朗读时自动使用。`;
       $('voice-clear').hidden = false;
     });
     bindCanvas();
@@ -7585,6 +7607,7 @@ const UI = (() => {
       if (type === 'awaiting') syncState();
     });
     Speech.init((msg) => { toast(msg, 6000); setSpeechUI(Speech.enabled()); });
+    bindAudioDefaults();
     syncState();
     return prefs;
   }
