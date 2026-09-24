@@ -1,0 +1,213 @@
+<div id="stage"><canvas id="gl" aria-label="登鹳雀楼三维场景：可拖动环顾，滚轮或双指缩放"></canvas></div>
+
+<!-- Loading -->
+<div id="loading" class="loading" role="status" aria-live="polite">
+  <div class="load-title">登鹳雀楼</div>
+  <div class="load-track"><div id="load-bar" class="load-bar"></div></div>
+  <div id="load-label" class="load-label">准备中</div>
+</div>
+
+<!-- Landing -->
+<section id="landing" class="landing" hidden>
+  <div class="landing-scrim"></div>
+  <div class="landing-inner">
+    <div class="title-block">
+      <h1 class="v-title" aria-label="登鹳雀楼"><span class="vcol "><span>登</span><span>鹳</span><span>雀</span><span>楼</span></span></h1>
+      <div class="v-author" aria-label="唐 王之涣"><span class="vcol "><span>唐</span></span><span class="vcol "><span>王</span><span>之</span><span>涣</span></span></div>
+      <div class="seal" aria-hidden="true"><span>入</span><span>境</span><span>循</span><span>文</span></div>
+    </div>
+    <div class="landing-actions">
+      <p class="landing-poem" aria-label="全诗">白日依山尽，黄河入海流。<br>欲穷千里目，更上一层楼。</p>
+      <button id="btn-enter" class="btn-primary" type="button">
+        <span class="btn-primary-main">循文入境</span>
+        <span class="btn-primary-sub">随诗人拾级登楼，从题目读到篇末</span>
+      </button>
+      <div class="landing-row">
+        <button id="btn-free" class="btn-ghost" type="button">自由观景</button>
+        <button id="btn-l-speech" class="chip" type="button" aria-pressed="false">朗读 · 关</button>
+        <button id="btn-l-sound" class="chip" type="button" aria-pressed="false">乐声 · 关</button>
+        <button id="btn-l-settings" class="chip" type="button">设置</button>
+      </div>
+      <p class="landing-hint">拖动可环顾 · 空格暂停 · 声音与朗读默认关闭</p>
+    </div>
+  </div>
+</section>
+
+<!-- Tour HUD -->
+<section id="hud" class="hud" hidden>
+  <header class="act-head" id="act-head">
+    <div class="act-no" id="act-no">序</div>
+    <div class="act-meta">
+      <div class="act-name" id="act-name">登楼</div>
+      <div class="act-where" id="act-where"></div>
+      <div class="act-doing" id="act-doing"></div>
+    </div>
+  </header>
+  <div id="caption" class="caption" aria-live="polite"></div>
+  <div class="subtitle-wrap">
+    <div id="await" class="await" hidden>
+      <span>本幕读完，可拖动环顾</span>
+      <button id="btn-continue" class="btn-continue" type="button">继续 ›</button>
+    </div>
+    <div id="subtitle" class="subtitle" aria-live="polite">
+      <div id="sub-orig" class="sub-orig"></div>
+      <div id="sub-vern" class="sub-vern"></div>
+    </div>
+    <div id="holding" class="holding" hidden>朗读中</div>
+  </div>
+  <button id="btn-recenter" class="recenter" type="button" hidden>回正视角</button>
+  <nav class="bar" aria-label="导览控制">
+    <div class="bar-progress">
+      <div id="progress" class="progress" role="slider" tabindex="0" aria-label="阅读进度" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
+        <div id="progress-segs" class="progress-segs"></div>
+        <div id="progress-fill" class="progress-fill"></div>
+        <div id="progress-knob" class="progress-knob"></div>
+      </div>
+    </div>
+    <div class="bar-buttons">
+      <div class="bar-group">
+        <button id="btn-prev" class="ib" type="button" aria-label="上一幕" title="上一幕（←）"><svg viewBox="0 0 24 24"><path d="M7 5v14M18 6l-8 6 8 6z"/></svg></button>
+        <button id="btn-play" class="ib ib-main" type="button" aria-label="暂停" title="暂停 / 继续（空格）"><svg id="ico-pause" viewBox="0 0 24 24"><path d="M8 5v14M16 5v14"/></svg><svg id="ico-play" viewBox="0 0 24 24" hidden><path d="M8 5l11 7-11 7z"/></svg></button>
+        <button id="btn-next" class="ib" type="button" aria-label="下一幕" title="下一幕（→）"><svg viewBox="0 0 24 24"><path d="M17 5v14M6 6l8 6-8 6z"/></svg></button>
+        <span id="time-label" class="time-label">0:00</span>
+      </div>
+      <div class="bar-group bar-right">
+        <button id="btn-pace" class="chip" type="button" title="连贯体验：自动接续；逐章慢读：每幕结束后停留">连贯体验</button>
+        <button id="btn-text" class="chip" type="button" title="字幕：原文＋白话 / 只看原文 / 只看白话">原文＋白话</button>
+        <button id="btn-toc" class="ib" type="button" aria-label="章节目录" title="章节目录（T）"><svg viewBox="0 0 24 24"><path d="M5 6h14M5 12h14M5 18h9"/></svg></button>
+        <button id="btn-speech" class="ib" type="button" aria-pressed="false" aria-label="朗读" title="朗读"><svg viewBox="0 0 24 24"><path d="M4 10v4h3l4 4V6L7 10zM15 9c1.5 1.5 1.5 4.5 0 6M18 7c2.7 2.7 2.7 7.3 0 10"/></svg><span class="ib-tag">诵</span></button>
+        <button id="btn-sound" class="ib" type="button" aria-pressed="false" aria-label="乐声与环境音" title="乐声与环境音"><svg viewBox="0 0 24 24"><path d="M9 17V5l10-2v12M9 17a2.5 2.5 0 1 1-5 0 2.5 2.5 0 0 1 5 0zM19 15a2.5 2.5 0 1 1-5 0 2.5 2.5 0 0 1 5 0z"/></svg></button>
+        <button id="btn-more" class="ib" type="button" aria-label="更多" aria-haspopup="true" title="更多"><svg viewBox="0 0 24 24"><path d="M6 12h.01M12 12h.01M18 12h.01"/></svg></button>
+      </div>
+    </div>
+  </nav>
+</section>
+
+<!-- Free viewing HUD -->
+<section id="freehud" class="freehud" hidden>
+  <header class="free-head">
+    <div class="free-title">登鹳雀楼 · 自由观景</div>
+    <div class="free-hint">拖动旋转 · 滚轮/双指缩放 · 点击楼、河、山、鹳雀可看注释</div>
+  </header>
+  <div class="free-bottom">
+    <div class="chips" id="vp-chips" role="group" aria-label="观景机位"></div>
+    <div class="chips" id="tod-chips" role="group" aria-label="时辰"></div>
+    <div class="free-actions">
+      <button id="btn-f-enter" class="btn-small-primary" type="button">循文入境</button>
+      <button id="btn-f-reset" class="chip" type="button">重置视角</button>
+      <button id="btn-f-sound" class="chip" type="button" aria-pressed="false">乐声 · 关</button>
+      <button id="btn-f-more" class="ib" type="button" aria-label="更多"><svg viewBox="0 0 24 24"><path d="M6 12h.01M12 12h.01M18 12h.01"/></svg></button>
+    </div>
+  </div>
+</section>
+
+<!-- More menu -->
+<div id="more" class="menu" role="menu" hidden>
+  <button id="m-recenter" role="menuitem" type="button">回正视角<kbd>R</kbd></button>
+  <button id="m-hide" role="menuitem" type="button">隐藏界面<kbd>H</kbd></button>
+  <button id="m-shot" role="menuitem" type="button">保存当前画面</button>
+  <button id="m-freeze" role="menuitem" type="button">暂停动态</button>
+  <button id="m-settings" role="menuitem" type="button">设置</button>
+  <button id="m-exit" role="menuitem" type="button">退出导览，自由观景</button>
+  <button id="m-tour" role="menuitem" type="button" hidden>循文入境（从头）</button>
+</div>
+
+<!-- Table of contents -->
+<aside id="toc" class="drawer" aria-label="章节目录" hidden>
+  <div class="drawer-head">
+    <h2>章节目录</h2>
+    <button id="toc-close" class="ib" type="button" aria-label="关闭"><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+  </div>
+  <ol id="toc-list" class="toc-list"></ol>
+  <div class="toc-poem">
+    <h3>全文</h3>
+    <p class="toc-poem-title">登鹳雀楼　<small>〔唐〕王之涣</small></p>
+    <p id="toc-poem-text" class="toc-poem-text"></p>
+    <h3>注释</h3>
+    <dl id="toc-gloss" class="toc-gloss"></dl>
+    <h3>关于这座楼</h3>
+    <p class="toc-note">北宋沈括《梦溪笔谈》：“河中府鹳雀楼三层，前瞻中条，下瞰大河。”画中的楼阁、城池、山势与人物衣冠，依据文献与唐代形制作艺术推演，不是对某处遗址的精确复原。原文写“黄河入海流”；站在楼上望不见大海，第五幕“心象”是想象之景，已在画面中标明。</p>
+  </div>
+</aside>
+
+<!-- Settings -->
+<aside id="settings" class="drawer" aria-label="设置" hidden>
+  <div class="drawer-head">
+    <h2>设置</h2>
+    <button id="settings-close" class="ib" type="button" aria-label="关闭"><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+  </div>
+  <div class="set-group">
+    <h3>画质</h3>
+    <div class="seg" role="radiogroup" aria-label="画质">
+      <button type="button" data-q="auto" role="radio">自动</button>
+      <button type="button" data-q="high" role="radio">高画质</button>
+      <button type="button" data-q="light" role="radio">轻量</button>
+    </div>
+    <p class="set-note" id="q-note">地形与植被的精细度在载入时确定，切换画质会重新载入页面。</p>
+    <label class="switch"><input id="opt-reduced" type="checkbox"><span>减少动态效果</span></label>
+    <p class="set-note">开启后，长距离的镜头飞行改为稳定的定格与淡入淡出，并关闭镜头轻微晃动。</p>
+  </div>
+  <div class="set-group">
+    <h3>声音</h3>
+    <label class="range"><span>乐声</span><input id="vol-music" type="range" min="0" max="1" step="0.05" value="0.55"></label>
+    <label class="range"><span>环境</span><input id="vol-amb" type="range" min="0" max="1" step="0.05" value="0.35"></label>
+    <p class="set-note">古风乐声由浏览器实时合成（古筝、箫、低音），音量刻意压低，朗读时自动避让。</p>
+  </div>
+  <div class="set-group">
+    <h3>朗读</h3>
+    <label class="select"><span>语音</span><select id="voice-select"></select></label>
+    <label class="range"><span>语速</span><input id="speech-rate" type="range" min="0.6" max="1.1" step="0.02" value="0.82"></label>
+    <div class="file-row">
+      <label class="btn-file"><input id="voice-file" type="file" accept="audio/*"><span>载入自备朗诵音频</span></label>
+      <button id="voice-clear" class="chip" type="button" hidden>清除</button>
+    </div>
+    <p class="set-note" id="voice-file-note">可载入自己录制或有权使用的整首朗诵（先读题目作者，再读四句），程序按停顿自动分句并与各幕同步。页面本身不附带任何朗诵录音。</p>
+  </div>
+</aside>
+
+<!-- Popover for glossary / scene objects -->
+<div id="pop" class="pop" role="dialog" aria-live="polite" hidden>
+  <button id="pop-close" class="pop-close" type="button" aria-label="关闭"><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+  <div id="pop-title" class="pop-title"></div>
+  <div id="pop-line" class="pop-line"></div>
+  <div id="pop-text" class="pop-text"></div>
+</div>
+
+<!-- End of the reading -->
+<section id="ending" class="ending" hidden>
+  <div class="ending-poem" aria-label="白日依山尽，黄河入海流。欲穷千里目，更上一层楼。"><span class="vcol "><span>白</span><span>日</span><span>依</span><span>山</span><span>尽</span></span><span class="vcol "><span>黄</span><span>河</span><span>入</span><span>海</span><span>流</span></span><span class="vcol "><span>欲</span><span>穷</span><span>千</span><span>里</span><span>目</span></span><span class="vcol "><span>更</span><span>上</span><span>一</span><span>层</span><span>楼</span></span><span class="vcol ending-title"><span>登</span><span>鹳</span><span>雀</span><span>楼</span></span></div>
+  <div class="ending-actions">
+    <button id="btn-again" class="btn-small-primary" type="button">重新开始</button>
+    <button id="btn-end-free" class="chip" type="button">自由观景</button>
+    <button id="btn-end-stay" class="chip" type="button">留在此处</button>
+  </div>
+</section>
+
+<button id="showui" class="showui" type="button" hidden>显示界面</button>
+<div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
+
+<!-- Screenshot preview -->
+<div id="shot" class="shot" role="dialog" aria-label="保存画面" hidden>
+  <div class="shot-inner">
+    <img id="shot-img" alt="当前画面截图">
+    <div class="shot-actions">
+      <a id="shot-dl" class="btn-small-primary" download="登鹳雀楼.png" href="#">下载 PNG</a>
+      <button id="shot-close" class="chip" type="button">关闭</button>
+    </div>
+    <p class="set-note">如果下载没有反应，可右键（或长按）图片保存。</p>
+  </div>
+</div>
+
+<!-- Fallbacks -->
+<div id="nogl" class="nogl" hidden>
+  <h1>登鹳雀楼</h1>
+  <p class="nogl-author">〔唐〕王之涣</p>
+  <p class="nogl-poem">白日依山尽，黄河入海流。<br>欲穷千里目，更上一层楼。</p>
+  <p class="nogl-vern">明亮的太阳依傍着西山，渐渐沉落；黄河滚滚向东，奔流入海。想要望尽千里之外的风光，那就再登上一层楼。</p>
+  <p class="nogl-msg">当前浏览器或设备无法使用 WebGL 2，三维场景不能显示。请换用较新的 Chrome、Edge、Safari 或 Firefox，并确认已开启硬件加速。</p>
+</div>
+<div id="fatal" class="nogl" hidden>
+  <h1>场景没有完成构建</h1>
+  <p class="msg nogl-msg"></p>
+  <p class="nogl-msg">可以刷新页面重试；若仍失败，可在设置中改用“轻量”画质（地址后加 <code>?q=light</code>）。</p>
+</div>
