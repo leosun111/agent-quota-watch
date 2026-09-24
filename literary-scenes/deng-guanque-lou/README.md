@@ -8,6 +8,7 @@
 
 ## 打开方式
 
+- 在线访问：https://leosun111.github.io/agent-quota-watch/ （GitHub Pages，来自仓库 `docs/`，由 `node build.mjs` 生成；含 `private/` 中的朗诵音轨时一并发布为 `docs/recitation.mp3`）。
 - 直接双击 `dist/deng-guanque-lou.html`（单文件，约 1 MB，three.js 与全部脚本已内嵌），离线可用。
 - 需要支持 WebGL2 的现代浏览器（Chrome / Edge / Safari 15+ / Firefox）。
 - 标题字体来自 Google Fonts；离线时自动回退到系统宋体/楷体，不影响功能。

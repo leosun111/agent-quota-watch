@@ -73,12 +73,6 @@ const headInner = tpl.match(/<head>([\s\S]*?)<\/head>/)[1]
 const artifact = `${headInner.trim()}\n${bodyHtml}\n${scripts}\n`;
 fs.writeFileSync(path.join(root, 'dist/artifact.html'), artifact);
 
-// GitHub Pages copy (public build, no embedded audio): <repo>/docs/index.html
-const pagesDir = path.join(root, '../../docs');
-if (fs.existsSync(pagesDir)) {
-  fs.writeFileSync(path.join(pagesDir, 'index.html'), html);
-  if (!fs.existsSync(path.join(pagesDir, '.nojekyll'))) fs.writeFileSync(path.join(pagesDir, '.nojekyll'), '');
-}
 
 const kb = (s) => (Buffer.byteLength(s) / 1024).toFixed(0) + ' KB';
 console.log(`built ${APP_FILES.length} modules → dist/deng-guanque-lou.html (${kb(html)}), dist/artifact.html (${kb(artifact)})`);
@@ -100,4 +94,21 @@ if (fs.existsSync(voiceAudio) && fs.existsSync(voiceMeta)) {
   fs.writeFileSync(path.join(root, 'dist/private/deng-guanque-lou.html'), vHtml);
   fs.writeFileSync(path.join(root, 'dist/private/artifact.html'), vArt);
   console.log(`with embedded recitation → dist/private/deng-guanque-lou.html (${kb(vHtml)}), dist/private/artifact.html (${kb(vArt)})`);
+}
+
+// GitHub Pages site: <repo>/docs/index.html. When the owner has placed a
+// recording in private/, the site carries it as docs/recitation.mp3 (loaded
+// beside the page); otherwise it is the plain public build.
+const pagesDir = path.join(root, '../../docs');
+if (fs.existsSync(pagesDir)) {
+  let page = html;
+  if (fs.existsSync(voiceAudio) && fs.existsSync(voiceMeta)) {
+    const meta = JSON.parse(fs.readFileSync(voiceMeta, 'utf8'));
+    meta.src = 'recitation.mp3';
+    fs.copyFileSync(voiceAudio, path.join(pagesDir, 'recitation.mp3'));
+    page = html.replace(scripts, () => `<script>window.__EMBED_VOICE=${JSON.stringify(meta)};</script>\n` + scripts);
+  }
+  fs.writeFileSync(path.join(pagesDir, 'index.html'), page);
+  if (!fs.existsSync(path.join(pagesDir, '.nojekyll'))) fs.writeFileSync(path.join(pagesDir, '.nojekyll'), '');
+  console.log(`GitHub Pages → docs/index.html (${kb(page)})${page !== html ? ' + docs/recitation.mp3' : ''}`);
 }

@@ -472,6 +472,7 @@ body.ui-hidden #hud *, body.ui-hidden #freehud *, body.ui-hidden #landing *, bod
   <p class="nogl-msg">可以刷新页面重试；若仍失败，可在设置中改用“轻量”画质（地址后加 <code>?q=light</code>）。</p>
 </div>
 
+<script>window.__EMBED_VOICE={"name":"登鹳雀楼（歌唱版）","song":true,"fadeIn":0.45,"fadeOut":0.9,"gain":0.85,"title":[0,14.3],"lines":[[14.5,20.3],[21.1,27],[27.7,33.7],[34.1,40.3]],"verse":[[40.7,47.4],[47.4,54],[54,60.3],[60.3,66.3]],"src":"recitation.mp3"};</script>
 <script>
 /* three.js r169 — MIT License, Copyright 2010-2024 three.js authors — https://threejs.org */
 var THREE=(function(){"use strict";
@@ -6703,7 +6704,14 @@ const Speech = (() => {
   let rate = 0.82;
   let notice = () => {};
   let custom = null; // { buffer, title:[s,e]|null, lines:[[s,e]x4], verse?:[[s,e]x4], name, fadeIn, fadeOut, gain }
-  const embedded = typeof window !== 'undefined' && window.__EMBED_VOICE && window.__EMBED_VOICE.b64 ? window.__EMBED_VOICE : null;
+  const EV = typeof window !== 'undefined' ? window.__EMBED_VOICE : null;
+  // inline (b64) or a file next to the page (src), fetched early so it is ready by the first cue
+  const embedded = EV && (EV.b64 || EV.src) ? EV : null;
+  let embeddedBytes = null;
+  if (embedded && embedded.src && typeof fetch === 'function') {
+    embeddedBytes = fetch(embedded.src).then((r) => { if (!r.ok) throw new Error('HTTP ' + r.status); return r.arrayBuffer(); });
+    embeddedBytes.catch(() => {});
+  }
   let job = null;
   const synth = typeof window !== 'undefined' && window.speechSynthesis ? window.speechSynthesis : null;
 
@@ -6941,10 +6949,15 @@ const Speech = (() => {
     if (!embedded) return false;
     const ctx = Sound.ensureCtx();
     if (!ctx) throw new Error('浏览器不支持 Web Audio');
-    const bin = atob(embedded.b64);
-    const bytes = new Uint8Array(bin.length);
-    for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
-    const buffer = await new Promise((res, rej) => ctx.decodeAudioData(bytes.buffer, res, rej));
+    let data;
+    if (embeddedBytes) data = (await embeddedBytes).slice(0);
+    else {
+      const bin = atob(embedded.b64);
+      const bytes = new Uint8Array(bin.length);
+      for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+      data = bytes.buffer;
+    }
+    const buffer = await new Promise((res, rej) => ctx.decodeAudioData(data, res, rej));
     custom = {
       buffer, name: embedded.name, title: embedded.title || null, lines: embedded.lines, verse: embedded.verse || null,
       fadeIn: embedded.fadeIn, fadeOut: embedded.fadeOut, gain: embedded.gain, embedded: true,
