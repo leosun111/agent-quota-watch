@@ -75,3 +75,22 @@ fs.writeFileSync(path.join(root, 'dist/artifact.html'), artifact);
 
 const kb = (s) => (Buffer.byteLength(s) / 1024).toFixed(0) + ' KB';
 console.log(`built ${APP_FILES.length} modules → dist/deng-guanque-lou.html (${kb(html)}), dist/artifact.html (${kb(artifact)})`);
+
+// Optional local build with a recitation recording embedded. The recording and
+// its timing file live in private/ and the output in dist/private/, both kept
+// out of git, so the repository never redistributes someone else's audio.
+//   private/recitation.mp3 + private/recitation.json ({ name, title, lines, verse?, song?, fadeIn?, fadeOut?, gain? })
+const voiceAudio = path.join(root, 'private/recitation.mp3');
+const voiceMeta = path.join(root, 'private/recitation.json');
+if (fs.existsSync(voiceAudio) && fs.existsSync(voiceMeta)) {
+  const meta = JSON.parse(fs.readFileSync(voiceMeta, 'utf8'));
+  meta.b64 = fs.readFileSync(voiceAudio).toString('base64');
+  meta.mime = 'audio/mpeg';
+  const embed = `<script>window.__EMBED_VOICE=${JSON.stringify(meta)};</script>\n`;
+  const withVoice = (doc) => doc.replace(scripts, () => embed + scripts);
+  fs.mkdirSync(path.join(root, 'dist/private'), { recursive: true });
+  const vHtml = withVoice(html), vArt = withVoice(artifact);
+  fs.writeFileSync(path.join(root, 'dist/private/deng-guanque-lou.html'), vHtml);
+  fs.writeFileSync(path.join(root, 'dist/private/artifact.html'), vArt);
+  console.log(`with embedded recitation → dist/private/deng-guanque-lou.html (${kb(vHtml)}), dist/private/artifact.html (${kb(vArt)})`);
+}

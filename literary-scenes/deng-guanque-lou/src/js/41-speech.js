@@ -2,7 +2,10 @@
  * 41-speech.js — recitation. Off by default. Two sources:
  *   · the browser's Chinese speech voice (speechSynthesis), line by line;
  *   · a recording the user loads from disk (any recitation they have the
- *     right to use), split into lines at pauses. No audio ships with the page.
+ *     right to use), split into lines at pauses; or one embedded by a local
+ *     build (window.__EMBED_VOICE) with hand-checked line timings. A sung
+ *     recording may carry a second pass (verse) that plays as one continuous
+ *     take for chapters that read all four lines. The public build ships no audio.
  * Sync is per line, from real start/end events — no word-level claims.
  * Gaps between lines are timed by the render loop (tick), not by timers.
  * ========================================================================== */
@@ -11,7 +14,8 @@ const Speech = (() => {
   let voice = null, voices = [];
   let rate = 0.82;
   let notice = () => {};
-  let custom = null; // { buffer, title:[s,e]|null, lines:[[s,e]x4], name }
+  let custom = null; // { buffer, title:[s,e]|null, lines:[[s,e]x4], verse?:[[s,e]x4], name, fadeIn, fadeOut, gain }
+  const embedded = typeof window !== 'undefined' && window.__EMBED_VOICE && window.__EMBED_VOICE.b64 ? window.__EMBED_VOICE : null;
   let job = null;
   const synth = typeof window !== 'undefined' && window.speechSynthesis ? window.speechSynthesis : null;
 
@@ -53,15 +57,37 @@ const Speech = (() => {
     return true;
   }
 
+  // A continuous take of several lines from the recording's second pass
+  function spanItem(act) {
+    const idx = act.speech.items.filter((it) => typeof it === 'number');
+    if (!custom || !custom.verse || idx.length < 2) return null;
+    const v = custom.verse, a = v[idx[0]][0], b = v[idx[idx.length - 1]][1];
+    return { span: [a, b], cues: idx.map((li) => [v[li][0] - a, li]), line: idx[0], text: '' };
+  }
+  // Seconds of recording a chapter will play (0 = unknown / speech engine)
+  function leadFor(act) {
+    if (!on || !act.speech) return 0;
+    const sp = spanItem(act);
+    return sp ? sp.span[1] - sp.span[0] : 0;
+  }
+
   // Items for a chapter: strings (title lines) or indices into POEM.lines
   function itemsFor(act) {
-    return act.speech.items.map((it) => {
+    const sp = spanItem(act);
+    if (sp) return [sp];
+    const items = act.speech.items.map((it) => {
       if (typeof it === 'number') {
         const L = POEM.lines[it];
         return { text: L.text + L.punct, line: it };
       }
       return { text: it.replace('　', '，'), line: -1, title: true };
     });
+    // a recording holds the title as one clip: play it once
+    if (custom) {
+      const t = items.filter((x) => x.title);
+      if (t.length > 1) return [t[0], ...items.filter((x) => !x.title)];
+    }
+    return items;
   }
 
   function speakAct(act, onItem) {
@@ -81,10 +107,18 @@ const Speech = (() => {
     job.elapsed = 0;
     job.started = false;
     // upper bound for one item, so a missing 'end' event can never stall the reading
-    job.maxDur = custom ? 3 + ((it.line >= 0 ? custom.lines[it.line] : custom.title || [0, 0])[1] - (it.line >= 0 ? custom.lines[it.line] : custom.title || [0, 0])[0]) : 4 + it.text.length * 0.75 / rate;
+    const seg = custom ? segOf(it) : null;
+    const from = job.resumeAt || 0;
+    job.resumeAt = 0;
+    job.maxDur = custom ? 3 + (seg ? seg[1] - seg[0] - from : 0) : 4 + it.text.length * 0.75 / rate;
+    job.itemStart = from;
+    job.cue = 0;
     const token = (job.token = {});
-    if (it.line >= 0 && job.onItem) job.onItem(it.line);
-    if (custom) return playSegment(it, token);
+    if (it.cues) {
+      while (job.cue + 1 < it.cues.length && it.cues[job.cue + 1][0] <= from) job.cue++;
+      if (job.onItem) job.onItem(it.cues[job.cue][1]);
+    } else if (it.line >= 0 && job.onItem) job.onItem(it.line);
+    if (custom) return playSegment(seg, from, token);
     if (!synth || !voice) { job.state = 'done'; return; }
     try { synth.cancel(); } catch (e) { /* ignored */ }
     const u = new SpeechSynthesisUtterance(it.text);
@@ -105,20 +139,27 @@ const Speech = (() => {
     synth.speak(u);
   }
 
-  function playSegment(it, token) {
+  const segOf = (it) => it.span || (it.line >= 0 ? custom.lines[it.line] : custom.title);
+
+  function playSegment(seg, from, token) {
     const ctx = Sound.ensureCtx();
     if (!ctx) { job.state = 'done'; return; }
-    const seg = it.line >= 0 ? custom.lines[it.line] : custom.title;
     if (!seg) { itemDone(); return; }
     if (ctx.state === 'suspended') ctx.resume();
     const src = ctx.createBufferSource();
     src.buffer = custom.buffer;
     const g = ctx.createGain();
-    g.gain.value = 1.0;
+    const t0 = ctx.currentTime + 0.02, dur = Math.max(0.05, seg[1] - seg[0] - from);
+    const vol = custom.gain || 1, fi = Math.min(custom.fadeIn || 0.03, dur / 3), fo = Math.min(custom.fadeOut || 0.08, dur / 3);
+    // soft edges: a sung take sits on a music bed that must not click in or out
+    g.gain.setValueAtTime(0, t0);
+    g.gain.linearRampToValueAtTime(vol, t0 + fi);
+    g.gain.setValueAtTime(vol, t0 + dur - fo);
+    g.gain.linearRampToValueAtTime(0, t0 + dur);
     src.connect(g);
     g.connect(ctx.destination);
     src.onended = () => { if (job && job.token === token) itemDone(); };
-    src.start(ctx.currentTime + 0.02, seg[0], Math.max(0.05, seg[1] - seg[0]));
+    src.start(t0, seg[0] + from, dur);
     job.started = true;
     job.src = src;
   }
@@ -139,6 +180,12 @@ const Speech = (() => {
       if (job.gapLeft <= 0) startItem();
     } else if (job.state === 'speaking') {
       job.elapsed += dt;
+      // continuous take: move the highlighted line along with the singing
+      const it = job.items[job.i];
+      if (it && it.cues && job.cue + 1 < it.cues.length && job.itemStart + job.elapsed >= it.cues[job.cue + 1][0]) {
+        job.cue++;
+        if (job.onItem) job.onItem(it.cues[job.cue][1]);
+      }
       if (!job.started) {
         job.watchdog += dt;
         if (job.watchdog > 4.5) {
@@ -162,9 +209,12 @@ const Speech = (() => {
     stopCurrent();
     job = null;
   }
-  // Pause: stop the sound now; on resume, repeat the interrupted line from its start.
+  // Pause: stop the sound now; on resume, repeat the interrupted line from its start
+  // (inside a continuous take: from the start of the line being sung).
   function pause() {
     if (!job || job.state === 'done') return;
+    const it = job.items[job.i];
+    if (job.state === 'speaking' && it && it.cues) job.resumeAt = it.cues[job.cue][0];
     stopCurrent();
     job.paused = true;
   }
@@ -197,6 +247,23 @@ const Speech = (() => {
     return { segments: segs.length, even, duration: buffer.duration };
   }
   function clearCustom() { custom = null; }
+
+  // The recording embedded by a local build: decoded on first use
+  async function loadEmbedded(opts = {}) {
+    if (!embedded) return false;
+    const ctx = Sound.ensureCtx();
+    if (!ctx) throw new Error('浏览器不支持 Web Audio');
+    const bin = atob(embedded.b64);
+    const bytes = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+    const buffer = await new Promise((res, rej) => ctx.decodeAudioData(bytes.buffer, res, rej));
+    custom = {
+      buffer, name: embedded.name, title: embedded.title || null, lines: embedded.lines, verse: embedded.verse || null,
+      fadeIn: embedded.fadeIn, fadeOut: embedded.fadeOut, gain: embedded.gain, embedded: true,
+    };
+    if (opts.enable !== false) on = true;
+    return true;
+  }
 
   // Split at pauses: RMS in 20 ms frames, silence ≥ 0.28 s separates phrases.
   function segment(buffer) {
@@ -235,7 +302,8 @@ const Speech = (() => {
   }
 
   return {
-    init, setEnabled, speakAct, tick, cancel, pause, resume, busy, loadFile, clearCustom,
+    init, setEnabled, speakAct, tick, cancel, pause, resume, busy, loadFile, clearCustom, loadEmbedded, leadFor,
+    embedded: () => (embedded ? embedded.name : null),
     enabled: () => on, available, voices: () => voices, setVoice: (v) => { voice = v; }, setRate: (r) => { rate = r; },
     get voice() { return voice; }, get custom() { return custom; }, get rate() { return rate; },
   };

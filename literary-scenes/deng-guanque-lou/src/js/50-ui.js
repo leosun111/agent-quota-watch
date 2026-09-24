@@ -38,6 +38,7 @@ const UI = (() => {
     };
   })();
   let storedVoice = null; // { blob, name } waiting to be decoded on first use
+  let useEmbedded = true; // a recording built into this copy of the page (local builds only)
 
   // ------------------------------------------------------------- helpers
   function toast(msg, ms = 4200) {
@@ -301,6 +302,7 @@ const UI = (() => {
     $('voice-clear').addEventListener('click', () => {
       Speech.clearCustom();
       storedVoice = null;
+      useEmbedded = false;
       voiceStore.clear();
       $('voice-clear').hidden = true;
       $('voice-file').value = '';
@@ -324,14 +326,22 @@ const UI = (() => {
       } catch (e) {
         toast('上次保存的朗诵音频无法读取，已改用浏览器语音。');
         voiceStore.clear();
-        $('voice-clear').hidden = true;
+        $('voice-clear').hidden = !Speech.embedded();
+      }
+    }
+    if (want && useEmbedded && !Speech.custom && Speech.embedded()) {
+      try {
+        await Speech.loadEmbedded({ enable: false });
+      } catch (e) {
+        useEmbedded = false;
+        toast('内置朗诵音轨无法播放，已改用浏览器语音。');
       }
     }
     const ok = Speech.setEnabled(want);
     setSpeechUI(want && ok);
     if (want && ok) {
       Sound.ensureCtx();
-      toast(Speech.custom ? '朗读已开启：使用你载入的朗诵音频' : `朗读已开启：${Speech.voice ? Speech.voice.name : '浏览器语音'}`, 2600);
+      toast(Speech.custom ? (Speech.custom.embedded ? `朗读已开启：内置音轨“${Speech.custom.name}”` : '朗读已开启：使用你载入的朗诵音频') : `朗读已开启：${Speech.voice ? Speech.voice.name : '浏览器语音'}`, 2600);
       app.speechTurnedOn();
     }
   }
@@ -505,6 +515,10 @@ const UI = (() => {
     buildToc();
     buildFree();
     buildSettings();
+    if (Speech.embedded()) {
+      $('voice-file-note').textContent = `本页已内置朗诵音轨“${Speech.embedded()}”，开启朗读时使用；朗读仍默认关闭。也可载入其他音频替换，或点“清除”改用浏览器语音。`;
+      $('voice-clear').hidden = false;
+    }
     voiceStore.load().then((r) => {
       if (!r || !r.blob || Speech.custom) return;
       storedVoice = r;

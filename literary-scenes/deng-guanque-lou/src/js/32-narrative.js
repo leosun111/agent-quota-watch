@@ -26,6 +26,11 @@ const Narrative = (() => {
   const total = () => ACTS.reduce((a, b) => a + b.dur, 0);
   const startOf = (i) => ACTS.slice(0, i).reduce((a, b) => a + b.dur, 0);
   const holdAt = (act) => act.dur - (act.id === 'vision' ? 3.5 : 0.8);
+  // when a recording will play one long take, start it early enough to finish before the hold
+  const speechAt = (act) => {
+    const lead = Speech.leadFor(act);
+    return lead ? Math.max(0.4, Math.min(act.speech.at, holdAt(act) - lead - 0.3)) : act.speech.at;
+  };
 
   function setAct(i, t = 0) {
     S.act = U.clamp(i, 0, ACTS.length - 1);
@@ -34,7 +39,7 @@ const Narrative = (() => {
     S.holding = false;
     S.ended = false;
     const act = ACTS[S.act];
-    S.spoken = !act.speech || S.t > act.speech.at + 0.25;
+    S.spoken = !act.speech || S.t > speechAt(act) + 0.25;
     S.line = -1;
     Speech.cancel();
     emit('act', { act: S.act });
@@ -132,7 +137,7 @@ const Narrative = (() => {
     if (S.mode !== 'tour' || !S.playing || S.awaiting || S.ended) return dipFade;
     const act = ACTS[S.act];
     // speech cue
-    if (!S.spoken && act.speech && S.t >= act.speech.at) {
+    if (!S.spoken && act.speech && S.t >= speechAt(act)) {
       S.spoken = true;
       Speech.speakAct(act, (idx) => { S.line = idx; emit('line', idx); });
     }
