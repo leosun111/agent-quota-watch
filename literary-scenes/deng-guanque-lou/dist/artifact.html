@@ -7346,11 +7346,38 @@ const UI = (() => {
     if (!url) { toast('截图失败：浏览器没有返回画面数据。'); return; }
     $('shot-img').src = url;
     const a = $('shot-dl');
+    // a same-origin blob: URL keeps the download attribute's filename (data: URLs lose it)
+    if (a.dataset.blob) URL.revokeObjectURL(a.dataset.blob);
+    a.dataset.blob = '';
     a.href = url;
+    try {
+      const bin = atob(url.split(',')[1]);
+      const bytes = new Uint8Array(bin.length);
+      for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+      a.href = a.dataset.blob = URL.createObjectURL(new Blob([bytes], { type: 'image/png' }));
+    } catch (e) { /* keep the data: URL */ }
     const d = new Date();
     a.download = `登鹳雀楼-${d.getFullYear()}${String(d.getMonth() + 1).padStart(2, '0')}${String(d.getDate()).padStart(2, '0')}-${String(d.getHours()).padStart(2, '0')}${String(d.getMinutes()).padStart(2, '0')}.png`;
     $('shot').hidden = false;
   }
+
+  // Inside the claude.ai artifact viewer plain download links are blocked;
+  // there the save goes through the host's downloads capability instead.
+  let hostDownloads = null;
+  if (window.claude && typeof window.claude.use === 'function') {
+    window.claude.use('downloads').then((d) => { hostDownloads = d; }, () => {});
+  }
+  document.addEventListener('click', (e) => {
+    const a = e.target.closest && e.target.closest('#shot-dl');
+    if (!a || !hostDownloads) return;
+    e.preventDefault();
+    fetch(a.href).then((r) => r.blob())
+      .then((blob) => hostDownloads.save({ filename: a.download || '登鹳雀楼.png', data: blob }))
+      .then(() => toast('画面已保存。'), (err) => {
+        if (err && err.code === 'declined') return;
+        toast('无法保存文件，可右键（或长按）图片另存。');
+      });
+  });
 
   return { init, frame, showMode, showObject, toast, hidePop, setHidden, syncState, showEnding, prefs };
 })();
