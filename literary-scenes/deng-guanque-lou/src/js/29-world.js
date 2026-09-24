@@ -48,7 +48,7 @@ const World = (() => {
     main.add(Fauna.buildBoats());
 
     progress(0.76, '诗人登场');
-    H.poet = Figures.makeFigure({ robe: 0xe6e0d0, robeDark: 0xcdc3ad, hat: 'futou', beard: true, pick: 'poet' });
+    H.poet = Figures.makeFigure({ style: 'scholar', robe: 0xeee7d5, robeDark: 0xd6ccb6, skin: 0xdcae88, hat: 'futou', beard: true, skirtLen: 0.62, pick: 'poet' });
     main.add(H.poet.root);
     // a keeper sweeping the court by the stair, and two townsfolk at the city gate
     H.keeper = Figures.makeFigure({ robe: 0x5d6570, robeDark: 0x4a515a, hat: 'kerchief', beard: false, skirtLen: 0.7, pick: 'city' });

@@ -13,6 +13,32 @@ const UI = (() => {
     save() { try { localStorage.setItem('dgl-prefs', JSON.stringify(prefs)); } catch (e) { /* storage unavailable */ } },
   };
 
+  // The viewer's own recitation file, kept in this browser (IndexedDB) so it
+  // need not be loaded again next visit. Never leaves the device.
+  const voiceStore = (() => {
+    const open = () => new Promise((res, rej) => {
+      const r = indexedDB.open('dgl-voice', 1);
+      r.onupgradeneeded = () => r.result.createObjectStore('files');
+      r.onsuccess = () => res(r.result);
+      r.onerror = () => rej(r.error);
+    });
+    const run = async (mode, fn) => {
+      const db = await open();
+      return new Promise((res, rej) => {
+        const tx = db.transaction('files', mode);
+        const q = fn(tx.objectStore('files'));
+        tx.oncomplete = () => { db.close(); res(q && q.result); };
+        tx.onerror = tx.onabort = () => { db.close(); rej(tx.error); };
+      });
+    };
+    return {
+      save: (blob, name) => run('readwrite', (st) => st.put({ blob, name }, 'voice')).catch(() => {}),
+      load: () => run('readonly', (st) => st.get('voice')).catch(() => null),
+      clear: () => run('readwrite', (st) => st.delete('voice')).catch(() => {}),
+    };
+  })();
+  let storedVoice = null; // { blob, name } waiting to be decoded on first use
+
   // ------------------------------------------------------------- helpers
   function toast(msg, ms = 4200) {
     const el = $('toast');
@@ -262,8 +288,10 @@ const UI = (() => {
         const msg = r.even
           ? `已载入“${f.name}”，但只找到 ${r.segments} 段停顿，已按时长平均分成四句。`
           : `已载入“${f.name}”，识别到 ${r.segments} 段，末四段对应四句诗${r.segments > 4 ? '，前面的部分作为题目与作者' : ''}。`;
-        $('voice-file-note').textContent = msg;
+        $('voice-file-note').textContent = msg + ' 已保存在本浏览器，下次打开无需重新载入。';
         $('voice-clear').hidden = false;
+        storedVoice = null;
+        voiceStore.save(f, f.name);
         setSpeechUI(true);
         toast(msg);
       } catch (err) {
@@ -272,6 +300,8 @@ const UI = (() => {
     });
     $('voice-clear').addEventListener('click', () => {
       Speech.clearCustom();
+      storedVoice = null;
+      voiceStore.clear();
       $('voice-clear').hidden = true;
       $('voice-file').value = '';
       $('voice-file-note').textContent = '已清除自备音频，朗读将使用浏览器语音。';
@@ -286,6 +316,17 @@ const UI = (() => {
   }
   async function toggleSpeech() {
     const want = !Speech.enabled();
+    if (want && storedVoice && !Speech.custom) {
+      const sv = storedVoice;
+      storedVoice = null;
+      try {
+        await Speech.loadFile(new File([sv.blob], sv.name), { enable: false });
+      } catch (e) {
+        toast('上次保存的朗诵音频无法读取，已改用浏览器语音。');
+        voiceStore.clear();
+        $('voice-clear').hidden = true;
+      }
+    }
     const ok = Speech.setEnabled(want);
     setSpeechUI(want && ok);
     if (want && ok) {
@@ -464,6 +505,12 @@ const UI = (() => {
     buildToc();
     buildFree();
     buildSettings();
+    voiceStore.load().then((r) => {
+      if (!r || !r.blob || Speech.custom) return;
+      storedVoice = r;
+      $('voice-file-note').textContent = `已记住上次载入的“${r.name}”，开启朗读时自动使用；朗读仍默认关闭。`;
+      $('voice-clear').hidden = false;
+    });
     bindCanvas();
     bindKeys();
     applyTextMode();

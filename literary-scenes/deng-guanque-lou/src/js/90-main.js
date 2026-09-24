@@ -5,7 +5,7 @@
 const Main = (() => {
   const qs = new URLSearchParams(location.search);
   let renderer, camera, quality, qualityName;
-  let lastT = 0, ambient = 0, frozen = false, reduced = false;
+  let lastT = 0, ambient = 0, frozen = false, reduced = false, camOverride = null;
   let freeStage = null, freeElev = 5.2;
   let running = false;
   const H = () => World.H;
@@ -153,6 +153,7 @@ const Main = (() => {
       Director.tickLook(dt, S.awaiting || !S.playing);
       Director.clampToGround(pose.pos);
       Director.apply(camera, pose, ambient, { reducedMotion: reduced });
+      if (camOverride) camOverride(camera, stage);
       Post.params.fade = Math.max(pose.fade, dipFade);
       Post.params.cloud = pose.cloud;
     } else {
@@ -350,6 +351,15 @@ const Main = (() => {
   function exposeDebug() {
     window.__dbg = {
       step,
+      // test hook: fixed camera around the poet, e.g. portrait(2.4, 20, 1.3)
+      portrait(dist, yawDeg = 0, h = 1.3, fov = 30) {
+        camOverride = dist ? (cam, st) => {
+          const p = st.poet.pos, a = st.poet.yaw + (yawDeg * Math.PI) / 180;
+          cam.position.set(p[0] + Math.sin(a) * dist, p[1] + h, p[2] + Math.cos(a) * dist);
+          cam.fov = fov; cam.near = 0.05; cam.updateProjectionMatrix();
+          cam.lookAt(p[0], p[1] + 1.0, p[2]);
+        } : null;
+      },
       shot(n = 1, dt = 1 / 30) { for (let i = 0; i < n; i++) step(dt); return renderer.domElement.toDataURL('image/png'); },
       jump(ai, t, play = false) {
         if (Narrative.S.mode !== 'tour') { Narrative.start(); UI.showMode('tour'); }

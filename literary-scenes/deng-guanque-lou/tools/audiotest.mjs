@@ -32,4 +32,13 @@ const s = await page.evaluate(async () => {
   return { busy1, busyAfter: N.mods.Speech.busy(), line: N.state().line };
 });
 console.log(JSON.stringify(s));
+// the recording is remembered in this browser: after a reload it is used when recitation is switched on
+await page.reload();
+await page.waitForFunction(() => window.__ready === true, null, { timeout: 240000 });
+await page.waitForFunction(() => /已记住/.test(document.getElementById('voice-file-note').textContent), null, { timeout: 10000 }).catch(() => {});
+const before = await page.evaluate(() => ({ note: document.getElementById('voice-file-note').textContent, on: window.__dbg.mods.Speech.enabled(), custom: !!window.__dbg.mods.Speech.custom }));
+console.log('after reload', JSON.stringify(before));
+await page.click('#btn-l-speech');
+await page.waitForFunction(() => window.__dbg.mods.Speech.enabled(), null, { timeout: 10000 }).catch(() => {});
+console.log('after toggle', JSON.stringify(await page.evaluate(() => ({ on: window.__dbg.mods.Speech.enabled(), custom: window.__dbg.mods.Speech.custom && window.__dbg.mods.Speech.custom.name, btn: document.getElementById('btn-l-speech').textContent }))));
 await browser.close();

@@ -176,7 +176,8 @@ const Speech = (() => {
   const busy = () => !!job && job.state !== 'done';
 
   // ------------------------------------------------------------- custom audio
-  async function loadFile(file) {
+  // opts.enable === false: prepare the recording without switching recitation on
+  async function loadFile(file, opts = {}) {
     const ctx = Sound.ensureCtx();
     if (!ctx) throw new Error('浏览器不支持 Web Audio');
     const arr = await file.arrayBuffer();
@@ -192,7 +193,7 @@ const Speech = (() => {
       lines = [0, 1, 2, 3].map((k) => [(d * k) / 4, (d * (k + 1)) / 4]);
     }
     custom = { buffer, lines, title, name: file.name, even };
-    on = true;
+    if (opts.enable !== false) on = true;
     return { segments: segs.length, even, duration: buffer.duration };
   }
   function clearCustom() { custom = null; }
