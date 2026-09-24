@@ -73,6 +73,13 @@ const headInner = tpl.match(/<head>([\s\S]*?)<\/head>/)[1]
 const artifact = `${headInner.trim()}\n${bodyHtml}\n${scripts}\n`;
 fs.writeFileSync(path.join(root, 'dist/artifact.html'), artifact);
 
+// GitHub Pages copy (public build, no embedded audio): <repo>/docs/index.html
+const pagesDir = path.join(root, '../../docs');
+if (fs.existsSync(pagesDir)) {
+  fs.writeFileSync(path.join(pagesDir, 'index.html'), html);
+  if (!fs.existsSync(path.join(pagesDir, '.nojekyll'))) fs.writeFileSync(path.join(pagesDir, '.nojekyll'), '');
+}
+
 const kb = (s) => (Buffer.byteLength(s) / 1024).toFixed(0) + ' KB';
 console.log(`built ${APP_FILES.length} modules → dist/deng-guanque-lou.html (${kb(html)}), dist/artifact.html (${kb(artifact)})`);
 
